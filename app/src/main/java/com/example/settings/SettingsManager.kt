@@ -184,4 +184,30 @@ class SettingsManager(context: Context) {
         current.add(distroId)
         prefs.edit().putStringSet(KEY_INSTALLED_DISTROS, current).apply()
     }
+
+    // --- Desktop & VNC persistence ---
+    fun isDesktopInstalled(distroId: String): Boolean {
+        return prefs.getBoolean("desktop_installed_$distroId", false)
+    }
+
+    fun setDesktopInstalled(distroId: String, installed: Boolean) {
+        prefs.edit().putBoolean("desktop_installed_$distroId", installed).apply()
+    }
+
+    fun isVncRunning(distroId: String): Boolean {
+        return prefs.getBoolean("vnc_running_$distroId", false)
+    }
+
+    fun setVncRunning(distroId: String, running: Boolean) {
+        prefs.edit().putBoolean("vnc_running_$distroId", running).apply()
+    }
+
+    // --- Custom Software Sources persistence ---
+    fun getCustomSourcesJson(): String {
+        return prefs.getString("custom_software_sources", "[]") ?: "[]"
+    }
+
+    fun saveCustomSourcesJson(json: String) {
+        prefs.edit().putString("custom_software_sources", json).apply()
+    }
 }

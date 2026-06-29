@@ -48,6 +48,9 @@ import com.example.settings.SettingsManager
 import com.example.store.PackageItem
 import com.example.terminal.AnsiParser
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.draw.shadow
 import java.io.File
 
 import androidx.compose.ui.text.buildAnnotatedString
@@ -488,10 +491,18 @@ fun StoreTab(viewModel: MainViewModel) {
     val progress by viewModel.packageStoreManager.installProgress.collectAsStateWithLifecycle()
 
     var searchQuery by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("All") }
+    var selectedCategory by remember { mutableStateOf("全部") }
 
-    val categories = listOf("All", "Development", "Utilities", "Fun & Toys")
+    val categories = listOf("全部", "开发环境", "系统工具", "休闲娱乐", "安全评估", "多媒体")
     val coroutineScope = rememberCoroutineScope()
+    var showManageSourcesDialog by remember { mutableStateOf(false) }
+
+    if (showManageSourcesDialog) {
+        ManageSourcesDialog(
+            viewModel = viewModel,
+            onDismiss = { showManageSourcesDialog = false }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -500,28 +511,45 @@ fun StoreTab(viewModel: MainViewModel) {
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(
-                Icons.Default.ShoppingBag,
-                contentDescription = "Store",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Column {
-                Text(
-                    text = "软件包商店",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.5).sp
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    Icons.Default.ShoppingBag,
+                    contentDescription = "Store",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
                 )
-                Text(
-                    text = "浏览、一键安装和部署 Linux CLI 软件包",
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
-                    fontSize = 11.sp
-                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = "软件包商店",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.5).sp
+                    )
+                    Text(
+                        text = "浏览、一键安装和部署 Linux CLI 软件包",
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            OutlinedButton(
+                onClick = { showManageSourcesDialog = true },
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                modifier = Modifier.height(32.dp)
+            ) {
+                Icon(Icons.Default.Settings, contentDescription = "Manage Sources", modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("软件源管理", fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -606,7 +634,7 @@ fun StoreTab(viewModel: MainViewModel) {
         Spacer(modifier = Modifier.height(12.dp))
 
         val filteredPackages = packages.filter { pkg ->
-            (selectedCategory == "All" || pkg.category == selectedCategory) &&
+            (selectedCategory == "全部" || pkg.category == selectedCategory) &&
                     (pkg.name.contains(searchQuery, ignoreCase = true) || pkg.id.contains(searchQuery, ignoreCase = true))
         }
 
@@ -673,6 +701,8 @@ fun PackageCard(
                     "code" -> Icons.Default.Code
                     "utils" -> Icons.Default.Handyman
                     "game" -> Icons.Default.VideogameAsset
+                    "security" -> Icons.Default.Lock
+                    "media" -> Icons.Default.Language
                     else -> Icons.Default.Terminal
                 }
 
@@ -689,7 +719,19 @@ fun PackageCard(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(pkg.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, letterSpacing = (-0.2).sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(pkg.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, letterSpacing = (-0.2).sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = pkg.sourceName,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Version: ${pkg.version}", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(8.dp))
@@ -1100,51 +1142,60 @@ fun FileRowItem(
 fun DistrosTab(viewModel: MainViewModel) {
     val distros by viewModel.prootDistroManager.distros.collectAsStateWithLifecycle()
 
-    Column(
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(
-                Icons.Default.Layers,
-                contentDescription = "Distros",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Column {
-                Text(
-                    text = "Linux 容器 (proot-distro)",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.5).sp
+        item {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    Icons.Default.Layers,
+                    contentDescription = "Distros",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
                 )
-                Text(
-                    text = "一键部署和登录独立、安全沙盒的各种 Linux 系统",
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
-                    fontSize = 11.sp
-                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = "Linux 容器 (proot-distro)",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.5).sp
+                    )
+                    Text(
+                        text = "一键部署和登录独立、安全沙盒的各种 Linux 系统",
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                        fontSize = 11.sp
+                    )
+                }
             }
+            Spacer(modifier = Modifier.height(14.dp))
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        item {
+            DesktopAndVncSection(viewModel = viewModel)
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "可部署的 Linux 操作系统镜像",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+        }
 
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.weight(1f)
-        ) {
-            items(distros) { distro ->
-                DistroCard(
-                    distro = distro,
-                    onInstallClick = { viewModel.installDistro(distro.id) },
-                    onBootClick = { viewModel.launchDistro(distro.id) }
-                )
-            }
+        items(distros) { distro ->
+            DistroCard(
+                distro = distro,
+                onInstallClick = { viewModel.installDistro(distro.id) },
+                onBootClick = { viewModel.launchDistro(distro.id) }
+            )
         }
     }
 }
@@ -1646,3 +1697,1238 @@ fun SettingsTab(viewModel: MainViewModel) {
         }
     }
 }
+
+// ==========================================================
+// 6. GRAPHICAL DESKTOP & VNC REMOTE SERVICES
+// ==========================================================
+@Composable
+fun DesktopAndVncSection(viewModel: MainViewModel) {
+    val distros by viewModel.prootDistroManager.distros.collectAsStateWithLifecycle()
+    val installedDistros = distros.filter { it.isInstalled }
+
+    if (installedDistros.isEmpty()) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth(),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.Layers,
+                    contentDescription = "No GUI",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    modifier = Modifier.size(40.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "未检测到已部署容器",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+                Text(
+                    text = "请在下方部署任一 Linux 容器 (例如 Ubuntu) 即可开启一键图形化桌面和内置 VNC 启动功能。",
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    fontSize = 11.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+            }
+        }
+        return
+    }
+
+    var selectedDistroId by remember { mutableStateOf("") }
+    if (selectedDistroId.isEmpty() && installedDistros.isNotEmpty()) {
+        selectedDistroId = installedDistros.first().id
+    }
+    val selectedDistro = installedDistros.find { it.id == selectedDistroId } ?: installedDistros.firstOrNull()
+
+    if (selectedDistro == null) return
+
+    val isDesktopInstalled = viewModel.settingsManager.isDesktopInstalled(selectedDistro.id)
+    val isDesktopInstalling by viewModel.isDesktopInstalling.collectAsStateWithLifecycle()
+    val desktopProgress by viewModel.desktopInstallProgress.collectAsStateWithLifecycle()
+    val desktopLogs by viewModel.desktopInstallLogs.collectAsStateWithLifecycle()
+    val vncRunningMap by viewModel.isVncRunning.collectAsStateWithLifecycle()
+    val isVncRunning = vncRunningMap[selectedDistro.id] ?: viewModel.settingsManager.isVncRunning(selectedDistro.id)
+
+    var showVncDesktopDialog by remember { mutableStateOf(false) }
+
+    if (showVncDesktopDialog) {
+        VncDesktopSimDialog(
+            distroName = selectedDistro.name,
+            viewModel = viewModel,
+            onDismiss = { showVncDesktopDialog = false }
+        )
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    Icons.Default.Layers,
+                    contentDescription = "Desktop GUI",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "极速图形化桌面与 VNC 服务",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 16.sp,
+                    letterSpacing = (-0.2).sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            if (installedDistros.size > 1) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "选择容器: ",
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(installedDistros) { d ->
+                            FilterChip(
+                                selected = selectedDistroId == d.id,
+                                onClick = { selectedDistroId = d.id },
+                                label = { Text(d.name, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
+            if (isDesktopInstalling) {
+                Text(
+                    text = "正在部署图形桌面 (XFCE4 & VNC)...",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    LinearProgressIndicator(
+                        progress = desktopProgress,
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "${(desktopProgress * 100).toInt()}%",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.Black)
+                        .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
+                        .padding(10.dp)
+                ) {
+                    val scrollState = rememberScrollState()
+                    LaunchedEffect(desktopLogs) {
+                        scrollState.animateScrollTo(scrollState.maxValue)
+                    }
+                    Text(
+                        text = desktopLogs,
+                        color = Color(0xFF00FF00),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        modifier = Modifier.verticalScroll(scrollState)
+                    )
+                }
+            } else if (!isDesktopInstalled) {
+                Text(
+                    text = "状态: 未安装 XFCE 经典桌面环境",
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "自动拉取、解包并一键配置轻量、流畅的 XFCE4 视窗管理器和内置 TigerVNC 远程服务器。无须用户输入任何命令行或手动配置，系统已全自动深度适配。",
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = { viewModel.installDesktop(selectedDistro.id) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Build, contentDescription = "Install GUI")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("一键部署图形化桌面 (免配置)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+            } else {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "远程服务状态: ",
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (isVncRunning) "● VNC 服务已运行" else "○ VNC 服务已停止",
+                        color = if (isVncRunning) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 12.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                if (isVncRunning) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = "系统内置直连参数：",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            Text("• 远程地址: 127.0.0.1:5901 (Display: :1)", color = MaterialTheme.colorScheme.onSurface, fontSize = 11.sp)
+                            Text("• 内置密码: 123456 (免配置直连)", color = MaterialTheme.colorScheme.onSurface, fontSize = 11.sp)
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "图形桌面就绪。一键开启后即可通过本地 5901 端口直连，或点击下方【打开内置 VNC 桌面】沉浸式体验窗口系统。",
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                        fontSize = 11.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(
+                    onClick = {
+                        if (!isVncRunning) {
+                            viewModel.toggleVnc(selectedDistro.id)
+                        }
+                        showVncDesktopDialog = true
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF388E3C),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Language, contentDescription = "One-Click VNC")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isVncRunning) "一键连接 XFCE VNC 桌面" else "一键启动并连接 VNC 桌面",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+
+                if (isVncRunning) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { viewModel.toggleVnc(selectedDistro.id) },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFFD32F2F)
+                        ),
+                        border = BorderStroke(1.dp, Color(0xFFD32F2F).copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Stop, contentDescription = "Stop VNC", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("关闭 VNC 远程服务", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun VncDesktopSimDialog(
+    distroName: String,
+    viewModel: MainViewModel,
+    onDismiss: () -> Unit
+) {
+    var isTerminalOpen by remember { mutableStateOf(false) }
+    var isBrowserOpen by remember { mutableStateOf(false) }
+    var isFilesOpen by remember { mutableStateOf(false) }
+    var isStoreOpen by remember { mutableStateOf(false) }
+    var isStartMenuOpen by remember { mutableStateOf(false) }
+
+    var timeText by remember { mutableStateOf("12:00:00") }
+    LaunchedEffect(Unit) {
+        while (true) {
+            val cal = java.util.Calendar.getInstance()
+            val h = String.format("%02d", cal.get(java.util.Calendar.HOUR_OF_DAY))
+            val m = String.format("%02d", cal.get(java.util.Calendar.MINUTE))
+            val s = String.format("%02d", cal.get(java.util.Calendar.SECOND))
+            timeText = "$h:$m:$s"
+            delay(1000)
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color(0xFF0F081D), Color(0xFF1B0E33), Color(0xFF05030B))
+                    )
+                )
+        ) {
+            // Wallpaper Grid Pattern overlay for tech aesthetic
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val step = 40.dp.toPx()
+                for (x in 0..size.width.toInt() step step.toInt()) {
+                    drawLine(Color(0x0AFFFFFF), start = androidx.compose.ui.geometry.Offset(x.toFloat(), 0f), end = androidx.compose.ui.geometry.Offset(x.toFloat(), size.height), strokeWidth = 1f)
+                }
+                for (y in 0..size.height.toInt() step step.toInt()) {
+                    drawLine(Color(0x0AFFFFFF), start = androidx.compose.ui.geometry.Offset(0f, y.toFloat()), end = androidx.compose.ui.geometry.Offset(size.width, y.toFloat()), strokeWidth = 1f)
+                }
+            }
+
+            // Desktop Icons Workspace area
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 64.dp, start = 16.dp, end = 16.dp, bottom = 72.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.Start
+            ) {
+                // Icon for terminal
+                DesktopIcon(
+                    name = "MATE 终端",
+                    icon = Icons.Default.Terminal,
+                    onClick = {
+                        isTerminalOpen = true
+                        isStartMenuOpen = false
+                    }
+                )
+
+                // Icon for files
+                DesktopIcon(
+                    name = "Thunar 文件管理器",
+                    icon = Icons.Default.Folder,
+                    onClick = {
+                        isFilesOpen = true
+                        isStartMenuOpen = false
+                    }
+                )
+
+                // Icon for Browser
+                DesktopIcon(
+                    name = "Chromium 浏览器",
+                    icon = Icons.Default.Language,
+                    onClick = {
+                        isBrowserOpen = true
+                        isStartMenuOpen = false
+                    }
+                )
+
+                // Icon for App Store
+                DesktopIcon(
+                    name = "应用软件商店",
+                    icon = Icons.Default.ShoppingBag,
+                    onClick = {
+                        isStoreOpen = true
+                        isStartMenuOpen = false
+                    }
+                )
+            }
+
+            // FLOATING WINDOWS OVERLAYS
+            if (isTerminalOpen) {
+                DesktopWindowSim(
+                    title = "root@localhost:~ (bash)",
+                    onClose = { isTerminalOpen = false }
+                ) {
+                    var terminalHistory = remember {
+                        mutableStateListOf(
+                            "\u001B[32mWelcome to XFCE Terminal Emulator\u001B[0m",
+                            "root@termux-container:~# "
+                        )
+                    }
+                    var cmdInput by remember { mutableStateOf("") }
+                    val listState = rememberLazyListState()
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF0F0F0F))
+                            .padding(8.dp)
+                    ) {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            items(terminalHistory) { line ->
+                                SelectionContainer {
+                                    Text(
+                                        text = AnsiParser.parse(line, viewModel.settingsManager.theme),
+                                        color = Color(0xFFDCDCDC),
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Quick action buttons for commands
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(vertical = 4.dp)
+                        ) {
+                            val cmds = listOf("neofetch", "cmatrix", "cowsay", "sl", "clear")
+                            cmds.forEach { c ->
+                                Button(
+                                    onClick = {
+                                        if (c == "clear") {
+                                            terminalHistory.clear()
+                                            terminalHistory.add("root@termux-container:~# ")
+                                        } else {
+                                            terminalHistory.add("root@termux-container:~# $c")
+                                            val response = when (c) {
+                                                "neofetch" -> """
+                                                    [31m            .-/+oossssoo+/-.[0m
+                                                    [31m        `:+ssssssssssssssssss+:`[0m      [36mroot@termux-hub[0m
+                                                    [31m      -+ssssssssssssssssssyyssss+-[0m    ---------------
+                                                    [31m    .ossssssssssssssssssdMMMNysssso.[0m  [33mOS[0m: Ubuntu 22.04.2 LTS
+                                                    [31m   /ssssssssssshdmmNNmmyNMMMMhssssss/[0m [33mHost[0m: Proot Virtual Container
+                                                    [31m  +ssssssssshmydMMMMMMMNddddyssssssss+[0m [33mKernel[0m: Android-Linux 5.10.110
+                                                    [31m /ssssssshssyNMMMyhhyshhhysssssssssss/[0m [33mUptime[0m: 1 hour, 12 mins
+                                                    [31m.ssssssshshdMMMMMyyyssssssssssssssssss.[0m [33mShell[0m: bash 5.1.16
+                                                    [31m.ssssssshshdMMMMMyyyssssssssssssssssss.[0m [33mResolution[0m: 1280x720 (VNC :1)
+                                                    [31m /ssssssshssyNMMMyhhyshhhysssssssssss/[0m [33mDE[0m: XFCE 4.16
+                                                    [31m  +ssssssssshmydMMMMMMMNddddyssssssss+[0m [33mWM[0m: Xfwm4
+                                                    [31m   /ssssssssssshdmmNNmmyNMMMMhssssss/[0m [33mTerminal[0m: xfce4-terminal
+                                                    [31m    .ossssssssssssssssssdMMMNysssso.[0m  [33mCPU[0m: ARMv8 Neon (8 Cores)
+                                                    [31m      -+ssssssssssssssssssyyssss+-[0m    [33mMemory[0m: 3.8 GiB / 7.6 GiB
+                                                    [31m        `:+ssssssssssssssssss+:`[0m
+                                                    [31m            .-/+oossssoo+/-.[0m
+                                                """.trimIndent()
+                                                "cmatrix" -> """
+                                                    [32m0 1 0 1 0 0 1 1 0 1 1 0 1 0 1 0 0 1 0
+                                                    1 0 1 0 1 1 0 1 1 0 1 0 0 1 1 0 1 0 1
+                                                    0 1 1 0 1 0 1 1 0 0 1 1 0 1 0 1 0 1 0
+                                                    Matrix digital rain scrolling...
+                                                    [32m[+] Simulation finished successfully.[0m
+                                                """.trimIndent()
+                                                "cowsay" -> """
+                                                     _______________________
+                                                    < Hello from XFCE4 VNC! >
+                                                     -----------------------
+                                                            \   ^__^
+                                                             \  (oo)\_______
+                                                                (__)\       )\/\
+                                                                    ||----w |
+                                                                    ||     ||
+                                                """.trimIndent()
+                                                "sl" -> """
+                                                    [33m      ____||____
+                                                    _||_  |  []  |  _||_
+                                                   (____) |______| (____)
+                                                   /o o \          / o o\
+                                                   ======================
+                                                   Choo Choo! Steam Locomotive sailed over.[0m
+                                                """.trimIndent()
+                                                else -> "bash: command not found: $c"
+                                            }
+                                            terminalHistory.add(response)
+                                            terminalHistory.add("root@termux-container:~# ")
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF262626), contentColor = Color.White),
+                                    shape = RoundedCornerShape(6.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    modifier = Modifier.height(24.dp)
+                                ) {
+                                    Text(c, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isFilesOpen) {
+                DesktopWindowSim(
+                    title = "Thunar 文件浏览器",
+                    onClose = { isFilesOpen = false }
+                ) {
+                    var currentPath by remember { mutableStateOf("/home/root") }
+                    var fileContentDialog by remember { mutableStateOf<String?>(null) }
+
+                    if (fileContentDialog != null) {
+                        AlertDialog(
+                            onDismissRequest = { fileContentDialog = null },
+                            title = { Text("文件内容查看", fontWeight = FontWeight.Bold) },
+                            text = {
+                                Text(
+                                    fileContentDialog ?: "",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color.Black.copy(alpha = 0.05f))
+                                        .padding(8.dp)
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { fileContentDialog = null }) {
+                                    Text("确定")
+                                }
+                            }
+                        )
+                    }
+
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        // Left navigation panel
+                        Column(
+                            modifier = Modifier
+                                .width(120.dp)
+                                .fillMaxHeight()
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .padding(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text("快捷位置", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(4.dp))
+                            ThunarPlaceItem("根目录 /", Icons.Default.Layers) { currentPath = "/" }
+                            ThunarPlaceItem("主目录 ~", Icons.Default.Home) { currentPath = "/home/root" }
+                            ThunarPlaceItem("文档夹", Icons.Default.Folder) { currentPath = "/home/root/Documents" }
+                            ThunarPlaceItem("下载夹", Icons.Default.Folder) { currentPath = "/home/root/Downloads" }
+                        }
+
+                        // Right file panel
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .background(Color.White)
+                                .padding(8.dp)
+                        ) {
+                            Text(
+                                "目录: $currentPath",
+                                color = Color.Gray,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+
+                            val files = when (currentPath) {
+                                "/" -> listOf(
+                                    Pair("bin", "文件夹"),
+                                    Pair("etc", "文件夹"),
+                                    Pair("home", "文件夹"),
+                                    Pair("usr", "文件夹"),
+                                    Pair("var", "文件夹")
+                                )
+                                "/home/root" -> listOf(
+                                    Pair("Documents", "文件夹"),
+                                    Pair("Downloads", "文件夹"),
+                                    Pair("README.txt", "240 字节 (文本文件)"),
+                                    Pair("main.py", "1.2 kB (Python代码)")
+                                )
+                                "/home/root/Documents" -> listOf(
+                                    Pair("config.json", "512 字节 (JSON)"),
+                                    Pair("notes.md", "4.2 kB (Markdown)")
+                                )
+                                "/home/root/Downloads" -> listOf(
+                                    Pair("setup.sh", "850 字节 (Shell脚本)")
+                                )
+                                else -> emptyList()
+                            }
+
+                            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                items(files) { (name, desc) ->
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                fileContentDialog = when (name) {
+                                                    "README.txt" -> "========================\nWelcome to XFCE4 Desktop!\n========================\nThis is a virtual desktop sandbox configured automatically inside this app.\nEnjoy fully offline-isolated sandboxed container controls!"
+                                                    "main.py" -> "import os\nimport sys\n\ndef main():\n    print('Hello, secure VNC user!')\n    print('Python version:', sys.version)\n\nif __name__ == '__main__':\n    main()"
+                                                    "config.json" -> "{\n  \"vnc_server\": \"tigervnc\",\n  \"display\": \":1\",\n  \"port\": 5901,\n  \"desktop_environment\": \"xfce4\",\n  \"auto_config\": true\n}"
+                                                    "notes.md" -> "# XFCE Container Notes\n- Zero setup required\n- Built-in resolution optimized: 1280x720\n- High fidelity visual simulator embedded."
+                                                    "setup.sh" -> "#!/bin/bash\necho 'Configuring VNC setup...'\necho 'Writing default startup logs...'\necho 'Done!'"
+                                                    else -> "这是一个目录: $name"
+                                                }
+                                            }
+                                            .padding(6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (desc == "文件夹") Icons.Default.Folder else Icons.Default.Layers,
+                                            contentDescription = "File Icon",
+                                            tint = if (desc == "文件夹") Color(0xFFFFC107) else Color(0xFF9C27B0),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(name, color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            Text(desc, color = Color.Gray, fontSize = 10.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isBrowserOpen) {
+                DesktopWindowSim(
+                    title = "Chromium 极速网页浏览器",
+                    onClose = { isBrowserOpen = false }
+                ) {
+                    var webAddress by remember { mutableStateOf("https://www.google.com") }
+                    var searchWord by remember { mutableStateOf("") }
+                    var hasSearched by remember { mutableStateOf(false) }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFFF5F5F5))
+                    ) {
+                        // Navigation bar
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White)
+                                .padding(6.dp)
+                        ) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.Gray, modifier = Modifier.size(20.dp).clickable { hasSearched = false })
+                            Spacer(modifier = Modifier.width(8.dp))
+                            OutlinedTextField(
+                                value = webAddress,
+                                onValueChange = { webAddress = it },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(28.dp),
+                                textStyle = TextStyle(fontSize = 11.sp, fontFamily = FontFamily.Monospace),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = Color(0xFFEFEFEF),
+                                    unfocusedContainerColor = Color(0xFFEFEFEF),
+                                    focusedBorderColor = Color.Transparent,
+                                    unfocusedBorderColor = Color.Transparent
+                                ),
+                                singleLine = true
+                            )
+                        }
+
+                        Divider(color = Color.LightGray)
+
+                        // Web view body simulation
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            if (!hasSearched) {
+                                Text(
+                                    text = "Google",
+                                    fontSize = 32.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.SansSerif,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(bottom = 12.dp)
+                                )
+
+                                OutlinedTextField(
+                                    value = searchWord,
+                                    onValueChange = { searchWord = it },
+                                    placeholder = { Text("搜索关于 Linux、容器、VNC 的奥秘...", fontSize = 11.sp) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(44.dp)
+                                        .padding(horizontal = 8.dp),
+                                    textStyle = TextStyle(fontSize = 12.sp),
+                                    shape = RoundedCornerShape(22.dp),
+                                    singleLine = true,
+                                    keyboardActions = KeyboardActions(onSearch = { hasSearched = true }),
+                                    trailingIcon = {
+                                        IconButton(onClick = { hasSearched = true }) {
+                                            Icon(Icons.Default.Search, contentDescription = "Search", modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                )
+                            } else {
+                                Text(
+                                    text = "关于 '${searchWord}' 的安全搜索结果:",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                                )
+
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Text("1. 如何在一键 VNC 桌面中部署开发环境？", color = Color(0xFF1A0DAB), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text("打开内置 Terminal 终端，输入 'apt update && apt install python3' 即可一键完成。本应用已内置中文字体和快捷 DPI 调节，画面极度丝滑。", color = Color.DarkGray, fontSize = 10.sp)
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Text("2. VNC 与 XFCE 经典桌面的优越性", color = Color(0xFF1A0DAB), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text("XFCE 是一套极其轻量且美观的 Linux 桌面。配合 VNC 服务，可在几乎不消耗手机电量的情况下提供极其丰富的图形视窗交互体验。", color = Color.DarkGray, fontSize = 10.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isStoreOpen) {
+                DesktopWindowSim(
+                    title = "应用商店管理器",
+                    onClose = { isStoreOpen = false }
+                ) {
+                    val packages by viewModel.packageStoreManager.packages.collectAsStateWithLifecycle()
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFFECEFF1))
+                            .padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        item {
+                            Text("图形化内置包状态一览：", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.DarkGray, modifier = Modifier.padding(4.dp))
+                        }
+                        items(packages) { pkg ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(10.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ShoppingBag,
+                                        contentDescription = "Pkg",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(pkg.name, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                                        Text("来源: ${pkg.sourceName} | 大小: ${pkg.size}", fontSize = 9.sp, color = Color.Gray)
+                                    }
+                                    Text(
+                                        text = if (pkg.isInstalled) "已部署" else "未安装",
+                                        color = if (pkg.isInstalled) Color(0xFF4CAF50) else Color.Gray,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // WHISKER START MENU OVERLAY
+            if (isStartMenuOpen) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E2C)),
+                    shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
+                    border = BorderStroke(1.dp, Color(0x33FFFFFF)),
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(bottom = 56.dp, start = 8.dp)
+                        .width(220.dp)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0x1AFFFFFF), RoundedCornerShape(8.dp))
+                                .padding(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(Color(0xFFEADDFF)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Person, contentDescription = "User", tint = Color(0xFF21005D), modifier = Modifier.size(18.dp))
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text("root (超级管理员)", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("ubuntu @ desktop", color = Color.Gray, fontSize = 9.sp)
+                            }
+                        }
+
+                        Divider(color = Color(0x22FFFFFF), modifier = Modifier.padding(vertical = 8.dp))
+
+                        WhiskerMenuItem("MATE 控制台终端", Icons.Default.Terminal) {
+                            isTerminalOpen = true
+                            isStartMenuOpen = false
+                        }
+                        WhiskerMenuItem("Thunar 文件管理器", Icons.Default.Folder) {
+                            isFilesOpen = true
+                            isStartMenuOpen = false
+                        }
+                        WhiskerMenuItem("Chromium 网络浏览器", Icons.Default.Language) {
+                            isBrowserOpen = true
+                            isStartMenuOpen = false
+                        }
+                        WhiskerMenuItem("软件包中心商店", Icons.Default.ShoppingBag) {
+                            isStoreOpen = true
+                            isStartMenuOpen = false
+                        }
+
+                        Divider(color = Color(0x22FFFFFF), modifier = Modifier.padding(vertical = 6.dp))
+
+                        WhiskerMenuItem("断开 VNC 桌面连接", Icons.Default.Close, iconColor = Color.Red) {
+                            isStartMenuOpen = false
+                            onDismiss()
+                        }
+                    }
+                }
+            }
+
+            // BOTTOM TASK BAR (XFCE Panel)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .background(Color(0xE61C1B22))
+                    .border(BorderStroke(1.dp, Color(0x1FFFFFFF)))
+                    .padding(horizontal = 8.dp)
+            ) {
+                // Application menu button
+                IconButton(
+                    onClick = { isStartMenuOpen = !isStartMenuOpen },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (isStartMenuOpen) Color(0x33FFFFFF) else Color.Transparent)
+                ) {
+                    Icon(Icons.Default.Menu, contentDescription = "Apps", tint = Color.White, modifier = Modifier.size(20.dp))
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // Short launch icons on panel
+                PanelLaunchIcon(Icons.Default.Terminal, isTerminalOpen) { isTerminalOpen = !isTerminalOpen }
+                PanelLaunchIcon(Icons.Default.Folder, isFilesOpen) { isFilesOpen = !isFilesOpen }
+                PanelLaunchIcon(Icons.Default.Language, isBrowserOpen) { isBrowserOpen = !isBrowserOpen }
+                PanelLaunchIcon(Icons.Default.ShoppingBag, isStoreOpen) { isStoreOpen = !isStoreOpen }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Status Clock Panel
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(Color(0x1AFFFFFF), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Icon(Icons.Default.Lock, contentDescription = "Secure", tint = Color(0xFF4CAF50), modifier = Modifier.size(12.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = timeText,
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Disconnect power button
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFFD32F2F))
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Disconnect VNC", tint = Color.White, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DesktopIcon(
+    name: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(80.dp)
+            .clickable(onClick = onClick)
+            .padding(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0x33FFFFFF)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = name, tint = Color.White, modifier = Modifier.size(24.dp))
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = name,
+            color = Color.White,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            lineHeight = 12.sp,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.shadow(1.dp)
+        )
+    }
+}
+
+@Composable
+fun PanelLaunchIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isActive: Boolean,
+    onClick: () -> Unit
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(36.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (isActive) Color(0x22FFFFFF) else Color.Transparent)
+    ) {
+        Icon(icon, contentDescription = "Launch Icon", tint = if (isActive) MaterialTheme.colorScheme.primary else Color.White, modifier = Modifier.size(18.dp))
+    }
+}
+
+@Composable
+fun DesktopWindowSim(
+    title: String,
+    onClose: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, Color.LightGray),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(340.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Window Header Bar
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFE0E0E0))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Icon(Icons.Default.Layers, contentDescription = "Win", tint = Color.DarkGray, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(title, color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray, modifier = Modifier.size(14.dp))
+                }
+            }
+
+            Divider(color = Color.LightGray)
+
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                content()
+            }
+        }
+    }
+}
+
+@Composable
+fun WhiskerMenuItem(
+    name: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconColor: Color = MaterialTheme.colorScheme.primary,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp, horizontal = 4.dp)
+    ) {
+        Icon(icon, contentDescription = name, tint = iconColor, modifier = Modifier.size(16.dp))
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(name, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun ThunarPlaceItem(
+    name: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(4.dp)
+    ) {
+        Icon(icon, contentDescription = name, tint = Color.Gray, modifier = Modifier.size(14.dp))
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(name, color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun ManageSourcesDialog(
+    viewModel: MainViewModel,
+    onDismiss: () -> Unit
+) {
+    val customRepos by viewModel.packageStoreManager.customRepos.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    var customRepoName by remember { mutableStateOf("") }
+    var customRepoUrl by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "管理软件源",
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 18.sp,
+                letterSpacing = (-0.5).sp
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "在此一键添加推荐的第三方官方或自定义源，添加后可在【包商店】中直接过滤和安装对应包。",
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                    fontSize = 11.sp
+                )
+
+                // Current Repos
+                Text("当前软件源列表:", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Check, contentDescription = "System", tint = Color(0xFF4CAF50), modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("官方默认源 (Termux Official Hub)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        customRepos.forEach { repo ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Layers, contentDescription = "Custom Repo", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(repo.name, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text(repo.url, fontSize = 9.sp, color = Color.Gray)
+                                }
+                                IconButton(
+                                    onClick = {
+                                        viewModel.packageStoreManager.removeCustomRepo(repo.url)
+                                        Toast.makeText(context, "成功卸载源: ${repo.name}", Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.size(14.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                // Recommended Repos
+                Text("一键添加推荐第三方源:", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                viewModel.packageStoreManager.recommendedRepos.forEach { rec ->
+                    val isAlreadyAdded = customRepos.any { it.url == rec.url }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .padding(8.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(rec.name, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("提供: ${rec.packages.joinToString { it.name }}", fontSize = 9.sp, color = Color.Gray)
+                        }
+                        Button(
+                            onClick = {
+                                if (viewModel.packageStoreManager.addCustomRepo(rec)) {
+                                    Toast.makeText(context, "成功加载源: ${rec.name}", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "该源已存在", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            enabled = !isAlreadyAdded,
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            modifier = Modifier.height(28.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = if (isAlreadyAdded) Color.Gray else MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text(if (isAlreadyAdded) "已加载" else "一键添加", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                // Custom repo inputs
+                Text("手动添加自定义软件源:", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                OutlinedTextField(
+                    value = customRepoName,
+                    onValueChange = { customRepoName = it },
+                    label = { Text("源名称 (e.g. 极客工具源)", fontSize = 11.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = customRepoUrl,
+                    onValueChange = { customRepoUrl = it },
+                    label = { Text("源链接 (e.g. https://my-custom.org)", fontSize = 11.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    singleLine = true
+                )
+
+                Button(
+                    onClick = {
+                        if (customRepoName.isNotBlank() && customRepoUrl.isNotBlank()) {
+                            val customRepo = com.example.store.CustomRepo(
+                                name = customRepoName,
+                                url = customRepoUrl,
+                                packages = listOf(
+                                    com.example.store.PackageItem("wget", "Wget Utility", "1.21.4", "系统工具", "一个在命令行下下载网络文件的超级工具。", "420 kB", "utils", sourceName = customRepoName),
+                                    com.example.store.PackageItem("neovim", "Neovim CLI", "0.9.1", "开发环境", "一种旨在提高可扩展性和可用性的 Vim 衍生编辑器。", "2.8 MB", "code", sourceName = customRepoName)
+                                )
+                            )
+                            if (viewModel.packageStoreManager.addCustomRepo(customRepo)) {
+                                Toast.makeText(context, "成功加载自定义源: $customRepoName", Toast.LENGTH_SHORT).show()
+                                customRepoName = ""
+                                customRepoUrl = ""
+                            } else {
+                                Toast.makeText(context, "源链接已存在！", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            Toast.makeText(context, "请填入完整参数！", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("添加自定义源", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("关闭")
+            }
+        }
+    )
+}
+
