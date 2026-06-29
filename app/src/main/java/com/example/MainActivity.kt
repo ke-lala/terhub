@@ -47,6 +47,7 @@ import com.example.proot.DistroItem
 import com.example.settings.SettingsManager
 import com.example.store.PackageItem
 import com.example.terminal.AnsiParser
+import com.example.vnc.VncViewContainer
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -1995,6 +1996,8 @@ fun VncDesktopSimDialog(
     viewModel: MainViewModel,
     onDismiss: () -> Unit
 ) {
+    var selectedTab by remember { mutableStateOf(0) } // 0 = 真实 VNC, 1 = 离线模拟桌面
+    
     var isTerminalOpen by remember { mutableStateOf(false) }
     var isBrowserOpen by remember { mutableStateOf(false) }
     var isFilesOpen by remember { mutableStateOf(false) }
@@ -2017,17 +2020,78 @@ fun VncDesktopSimDialog(
         onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0xFF0F081D), Color(0xFF1B0E33), Color(0xFF05030B))
-                    )
-                )
+                .background(Color(0xFF0C091A))
         ) {
-            // Wallpaper Grid Pattern overlay for tech aesthetic
-            Canvas(modifier = Modifier.fillMaxSize()) {
+            // Mode Select Top Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF141124))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier
+                        .background(Color(0xFF1F1B35), RoundedCornerShape(8.dp))
+                        .padding(2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val activeColor = ButtonDefaults.buttonColors(containerColor = Color(0xFF4F46E5), contentColor = Color.White)
+                    val idleColor = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.LightGray)
+                    
+                    Button(
+                        onClick = { selectedTab = 0 },
+                        colors = if (selectedTab == 0) activeColor else idleColor,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.height(30.dp)
+                    ) {
+                        Icon(Icons.Default.Language, contentDescription = "Real VNC", modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("连接真实 VNC", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                    
+                    Button(
+                        onClick = { selectedTab = 1 },
+                        colors = if (selectedTab == 1) activeColor else idleColor,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.height(30.dp)
+                    ) {
+                        Icon(Icons.Default.Monitor, contentDescription = "Sim", modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("体验模拟桌面", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                
+                IconButton(
+                    onClick = onDismiss,
+                    colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White),
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Dismiss", modifier = Modifier.size(16.dp))
+                }
+            }
+            
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                if (selectedTab == 0) {
+                    VncViewContainer(onClose = onDismiss)
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color(0xFF0F081D), Color(0xFF1B0E33), Color(0xFF05030B))
+                                )
+                            )
+                    ) {
+                        // Wallpaper Grid Pattern overlay for tech aesthetic
+                        Canvas(modifier = Modifier.fillMaxSize()) {
                 val step = 40.dp.toPx()
                 for (x in 0..size.width.toInt() step step.toInt()) {
                     drawLine(Color(0x0AFFFFFF), start = androidx.compose.ui.geometry.Offset(x.toFloat(), 0f), end = androidx.compose.ui.geometry.Offset(x.toFloat(), size.height), strokeWidth = 1f)
@@ -2628,6 +2692,9 @@ fun VncDesktopSimDialog(
             }
         }
     }
+}
+}
+}
 }
 
 @Composable
