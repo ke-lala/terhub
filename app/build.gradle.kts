@@ -65,7 +65,7 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      signingConfig = signingConfigs.getByName("debugConfig")
     }
     debug {
       signingConfig = signingConfigs.getByName("debugConfig")
@@ -150,9 +150,6 @@ dependencies {
   "ksp"(libs.moshi.kotlin.codegen)
 }
 
-tasks.register<Copy>("copyApkToRoot") {
-    from(layout.buildDirectory.dir("outputs/apk/debug"))
-    include("app-debug.apk")
-    into(rootDir)
-}
+
+
 
