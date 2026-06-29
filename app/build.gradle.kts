@@ -1,4 +1,25 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.io.File
+import java.util.Base64
+
+// Decode debug.keystore.base64 to debug.keystore if it doesn't exist
+val base64File = File(rootDir, "debug.keystore.base64")
+val keystoreFile = File(rootDir, "debug.keystore")
+println("--- Keystore Debug ---")
+println("rootDir: ${rootDir.absolutePath}")
+println("base64File path: ${base64File.absolutePath}, exists: ${base64File.exists()}")
+println("keystoreFile path: ${keystoreFile.absolutePath}, exists: ${keystoreFile.exists()}")
+if (base64File.exists() && !keystoreFile.exists()) {
+    try {
+        val base64Content = base64File.readText().trim().replace("\\s".toRegex(), "")
+        val decodedBytes = Base64.getDecoder().decode(base64Content)
+        keystoreFile.writeBytes(decodedBytes)
+        println("Successfully decoded debug.keystore from base64")
+    } catch (e: Exception) {
+        println("Error decoding debug.keystore: ${e.message}")
+    }
+}
+println("----------------------")
 
 plugins {
   alias(libs.plugins.android.application)
@@ -11,12 +32,12 @@ plugins {
 
 android {
   namespace = "com.example"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  compileSdk = 36
 
   defaultConfig {
     applicationId = "com.aistudio.termuxbranch.fhwmsx"
     minSdk = 24
-    targetSdk = 36
+    targetSdk = 34
     versionCode = 1
     versionName = "1.0"
 
