@@ -1,0 +1,6 @@
+{
+  "name": "Termux Branch",
+  "description": "A customized Termux branch featuring a Package Store, direct File Manager and Editor, customizable Terminal themes and shortcuts, and built-in proot-distro Linux containers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
